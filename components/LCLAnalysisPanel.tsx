@@ -1,12 +1,14 @@
+
 import React, { useState } from 'react';
 import { LCLContainer } from '../types';
-import { Layers, ChevronDown, ChevronUp, Package, User } from 'lucide-react';
+import { Layers, ChevronDown, ChevronUp, Package, User, Download } from 'lucide-react';
 
 interface LCLAnalysisPanelProps {
   lclContainers: LCLContainer[];
+  onExport: () => void;
 }
 
-export const LCLAnalysisPanel: React.FC<LCLAnalysisPanelProps> = ({ lclContainers }) => {
+export const LCLAnalysisPanel: React.FC<LCLAnalysisPanelProps> = ({ lclContainers, onExport }) => {
   if (lclContainers.length === 0) return null;
 
   return (
@@ -16,9 +18,19 @@ export const LCLAnalysisPanel: React.FC<LCLAnalysisPanelProps> = ({ lclContainer
           <Layers className="h-5 w-5 text-orange-600" />
           <h3 className="font-bold text-slate-800 text-lg">LCL / Groupage Containers</h3>
         </div>
-        <span className="bg-orange-100 text-orange-800 text-xs font-bold px-3 py-1 rounded-full border border-orange-200">
-          {lclContainers.length} Multi-BL Containers Detected
-        </span>
+        <div className="flex items-center gap-3">
+            <span className="bg-orange-100 text-orange-800 text-xs font-bold px-3 py-1 rounded-full border border-orange-200">
+            {lclContainers.length} Multi-BL Containers Detected
+            </span>
+            <button 
+                onClick={onExport}
+                className="flex items-center gap-2 px-3 py-1.5 bg-white border border-slate-300 rounded text-xs font-bold text-slate-700 hover:bg-slate-50 hover:text-orange-700 transition-colors"
+                title="Download LCL Report"
+            >
+                <Download className="h-3.5 w-3.5" />
+                Export List
+            </button>
+        </div>
       </div>
 
       <div className="p-6 grid grid-cols-1 gap-4">

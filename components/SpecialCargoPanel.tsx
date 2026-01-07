@@ -1,17 +1,18 @@
+
 import React, { useState } from 'react';
 import { SpecialCargoContainer } from '../types';
-import { Flame, Snowflake, ChevronDown, ChevronUp, Package, Thermometer, Zap, ShieldAlert, User } from 'lucide-react';
+import { Flame, Snowflake, ChevronDown, ChevronUp, Package, Thermometer, Zap, ShieldAlert, User, Download } from 'lucide-react';
 
 interface SpecialCargoPanelProps {
   type: 'IMDG' | 'REEFER';
   containers: SpecialCargoContainer[];
+  onExport: () => void;
 }
 
-export const SpecialCargoPanel: React.FC<SpecialCargoPanelProps> = ({ type, containers }) => {
+export const SpecialCargoPanel: React.FC<SpecialCargoPanelProps> = ({ type, containers, onExport }) => {
   if (containers.length === 0) return null;
 
   const isReefer = type === 'REEFER';
-  const themeColor = isReefer ? 'cyan' : 'red';
   const Icon = isReefer ? Snowflake : Flame;
   const title = isReefer ? 'Reefer Containers' : 'IMDG / Dangerous Cargo';
 
@@ -23,11 +24,23 @@ export const SpecialCargoPanel: React.FC<SpecialCargoPanelProps> = ({ type, cont
           <Icon className={`h-5 w-5 ${isReefer ? 'text-cyan-600' : 'text-red-600'}`} />
           <h3 className="font-bold text-slate-800 text-lg">{title}</h3>
         </div>
-        <span className={`text-xs font-bold px-3 py-1 rounded-full border ${
-          isReefer ? 'bg-cyan-100 text-cyan-800 border-cyan-200' : 'bg-red-100 text-red-800 border-red-200'
-        }`}>
-          {containers.length} Units Found
-        </span>
+        <div className="flex items-center gap-3">
+            <span className={`text-xs font-bold px-3 py-1 rounded-full border ${
+            isReefer ? 'bg-cyan-100 text-cyan-800 border-cyan-200' : 'bg-red-100 text-red-800 border-red-200'
+            }`}>
+            {containers.length} Units Found
+            </span>
+            <button 
+                onClick={onExport}
+                className={`flex items-center gap-2 px-3 py-1.5 bg-white border border-slate-300 rounded text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors ${
+                    isReefer ? 'hover:text-cyan-700' : 'hover:text-red-700'
+                }`}
+                title={`Download ${type} Report`}
+            >
+                <Download className="h-3.5 w-3.5" />
+                Export List
+            </button>
+        </div>
       </div>
 
       {/* List */}

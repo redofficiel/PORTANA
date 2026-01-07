@@ -1,4 +1,5 @@
-import { Manifest, ContainerRow, AnalysisResult, LCLContainer, SpecialCargoContainer } from '../types';
+
+import { Manifest, ContainerRow, AnalysisResult, LCLContainer, SpecialCargoContainer, ContainerError } from '../types';
 import * as XLSX from 'xlsx';
 
 /**
@@ -97,7 +98,7 @@ export const flattenManifestData = (manifests: Manifest[]): ContainerRow[] => {
 };
 
 /**
- * Analyzes the flattened rows to produce unique container statistics and identify LCL, IMDG, and Reefer containers.
+ * Analyzes the flattened rows to produce unique container statistics and identify LCL, IMDG, Reefer, and Error containers.
  */
 export const analyzeManifestData = (rows: ContainerRow[]): AnalysisResult => {
   // Map to track unique containers and their aggregated data
@@ -157,6 +158,7 @@ export const analyzeManifestData = (rows: ContainerRow[]): AnalysisResult => {
   const lclList: LCLContainer[] = [];
   const imdgList: SpecialCargoContainer[] = [];
   const reeferList: SpecialCargoContainer[] = [];
+  const errorList: ContainerError[] = [];
 
   containerMap.forEach((data, num) => {
     totalUnique++;
@@ -186,7 +188,6 @@ export const analyzeManifestData = (rows: ContainerRow[]): AnalysisResult => {
     }
 
     // 2. IMDG Logic
-    // Has IMDG class OR UN Code OR explicitly marked
     if (data.imdgClass || data.unCode) {
       imdgList.push({
         num_conteneur: num,
@@ -199,7 +200,6 @@ export const analyzeManifestData = (rows: ContainerRow[]): AnalysisResult => {
     }
 
     // 3. Reefer Logic
-    // Flag is '1' OR ISO code starts with 'R'
     const isReefer = data.reeferFlag || (data.iso && data.iso.toUpperCase().startsWith('R'));
     if (isReefer) {
       reeferList.push({
@@ -208,7 +208,23 @@ export const analyzeManifestData = (rows: ContainerRow[]): AnalysisResult => {
         code_iso: data.iso,
         bls: blList,
         temperature: data.temp,
-        is_active_reefer: data.reeferFlag // For "Power Required" check
+        is_active_reefer: data.reeferFlag
+      });
+    }
+
+    // 4. Error / Anomaly Logic
+    const reasons: string[] = [];
+    if (!data.iso || data.iso.trim() === '') reasons.push('Missing ISO Type');
+    if (data.size === 0) reasons.push('Unknown Size');
+    if (!num || num === 'UNKNOWN') reasons.push('Invalid Number');
+
+    if (reasons.length > 0) {
+      errorList.push({
+        num_conteneur: num,
+        taille_conteneur: data.size,
+        code_iso: data.iso,
+        bls: blList,
+        reasons: reasons
       });
     }
   });
@@ -220,6 +236,7 @@ export const analyzeManifestData = (rows: ContainerRow[]): AnalysisResult => {
   lclList.sort(sortFn);
   imdgList.sort(sortFn);
   reeferList.sort(sortFn);
+  errorList.sort(sortFn);
 
   return {
     stats: {
@@ -231,23 +248,91 @@ export const analyzeManifestData = (rows: ContainerRow[]): AnalysisResult => {
       countFCL: fcl,
       countUnknownSize: cUnknown,
       countIMDG: imdgList.length,
-      countReefer: reeferList.length
+      countReefer: reeferList.length,
+      countErrors: errorList.length
     },
     lclContainers: lclList,
     imdgContainers: imdgList,
-    reeferContainers: reeferList
+    reeferContainers: reeferList,
+    errorContainers: errorList
   };
 };
 
-/**
- * Generates and triggers a download of the XLSX file.
- */
+// --- Export Helper Functions ---
+
+const triggerDownload = (workbook: XLSX.WorkBook, filename: string) => {
+  XLSX.writeFile(workbook, filename);
+};
+
 export const downloadXlsx = (rows: ContainerRow[], fileName: string) => {
   const worksheet = XLSX.utils.json_to_sheet(rows);
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, "Manifest Data");
+  const cleanName = fileName.replace('.json', '') + '_Full_Export.xlsx';
+  triggerDownload(workbook, cleanName);
+};
+
+export const downloadLCLReport = (data: LCLContainer[], fileName: string) => {
+  const rows = data.flatMap(c => 
+    c.bls.map(bl => ({
+      'Container No': c.num_conteneur,
+      'Size': c.taille_conteneur,
+      'BL Number': bl.num_bl,
+      'Consignee': bl.client,
+      'Weight': bl.weight
+    }))
+  );
   
-  // Clean filename
-  const cleanName = fileName.replace('.json', '') + '_Processed.xlsx';
-  XLSX.writeFile(workbook, cleanName);
+  const worksheet = XLSX.utils.json_to_sheet(rows);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "LCL Containers");
+  const cleanName = fileName.replace('.json', '') + '_LCL_Report.xlsx';
+  triggerDownload(workbook, cleanName);
+};
+
+export const downloadSpecialCargoReport = (data: SpecialCargoContainer[], type: 'IMDG' | 'REEFER', fileName: string) => {
+  const rows = data.flatMap(c => 
+    c.bls.map(bl => {
+      const base = {
+        'Container No': c.num_conteneur,
+        'Size': c.taille_conteneur,
+        'ISO': c.code_iso,
+        'BL Number': bl.num_bl,
+        'Consignee': bl.client,
+        'Weight': bl.weight
+      };
+      
+      if (type === 'IMDG') {
+        return { ...base, 'IMDG Class': c.classe_imdg, 'UN Number': c.code_un };
+      } else {
+        return { ...base, 'Temperature': c.temperature, 'Reefer Flag': c.is_active_reefer ? 'Y' : 'N' };
+      }
+    })
+  );
+
+  const worksheet = XLSX.utils.json_to_sheet(rows);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, `${type} Containers`);
+  const cleanName = fileName.replace('.json', '') + `_${type}_Report.xlsx`;
+  triggerDownload(workbook, cleanName);
+};
+
+export const downloadErrorReport = (data: ContainerError[], fileName: string) => {
+  const rows = data.flatMap(c => 
+    c.bls.map(bl => ({
+      'Container No': c.num_conteneur,
+      'Declared Size': c.taille_conteneur,
+      'ISO': c.code_iso,
+      'Errors': c.reasons.join(', '),
+      'BL Number': bl.num_bl,
+      'Consignee': bl.client,
+      'Weight': bl.weight
+    }))
+  );
+
+  const worksheet = XLSX.utils.json_to_sheet(rows);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Anomalies");
+  const cleanName = fileName.replace('.json', '') + '_Anomalies_Report.xlsx';
+  triggerDownload(workbook, cleanName);
 };

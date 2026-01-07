@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ContainerRow } from '../types';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Snowflake, Flame, Package } from 'lucide-react';
+import { ContainerSizeBadge } from './ContainerBadges';
 
 interface DataTableProps {
   rows: ContainerRow[];
@@ -29,18 +30,20 @@ export const DataTable: React.FC<DataTableProps> = ({ rows }) => {
 
   if (rows.length === 0) {
     return (
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-10 text-center">
-        <p className="text-slate-500">No records found matching the current filter.</p>
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-12 text-center">
+        <Package className="h-10 w-10 text-slate-300 mx-auto mb-3" />
+        <h3 className="text-slate-900 font-medium">No containers found</h3>
+        <p className="text-slate-500 text-sm">Try adjusting your filters to see more results.</p>
       </div>
     );
   }
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
-      <div className="px-6 py-4 border-b border-slate-200 bg-slate-50 flex justify-between items-center sticky top-0">
+      <div className="px-6 py-3 border-b border-slate-200 bg-slate-50/80 flex justify-between items-center sticky top-0 backdrop-blur-sm z-10">
         <div>
-          <h3 className="font-semibold text-slate-800">Container List</h3>
-          <p className="text-xs text-slate-500 mt-0.5">
+          <h3 className="font-bold text-slate-800 text-sm uppercase tracking-wide">DETAILED LIST</h3>
+          <p className="text-xs text-slate-500">
             Showing {startIndex + 1}-{Math.min(startIndex + itemsPerPage, rows.length)} of {rows.length.toLocaleString()} records
           </p>
         </div>
@@ -51,19 +54,19 @@ export const DataTable: React.FC<DataTableProps> = ({ rows }) => {
              <button
                onClick={handlePrev}
                disabled={currentPage === 1}
-               className="p-1 rounded-md border border-slate-300 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+               className="p-1.5 rounded border border-slate-300 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
              >
-               <ChevronLeft className="h-5 w-5" />
+               <ChevronLeft className="h-4 w-4" />
              </button>
-             <span className="text-sm font-medium text-slate-700">
+             <span className="text-xs font-mono font-medium text-slate-700 bg-slate-100 px-2 py-1 rounded">
                {currentPage} / {totalPages}
              </span>
              <button
                onClick={handleNext}
                disabled={currentPage === totalPages}
-               className="p-1 rounded-md border border-slate-300 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+               className="p-1.5 rounded border border-slate-300 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
              >
-               <ChevronRight className="h-5 w-5" />
+               <ChevronRight className="h-4 w-4" />
              </button>
            </div>
         )}
@@ -73,47 +76,59 @@ export const DataTable: React.FC<DataTableProps> = ({ rows }) => {
         <table className="min-w-full divide-y divide-slate-200 text-sm">
           <thead className="bg-slate-50">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Container No</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Size</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Type (ISO)</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Status</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">BL Number</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Client Final</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Groupage</th>
+              <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider w-24">SIZE</th>
+              <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">CONTAINER NO</th>
+              <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">ISO TYPE</th>
+              <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">CATEGORY</th>
+              <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">STATUS</th>
+              <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">BL REFERENCE</th>
+              <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">CONSIGNEE</th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-slate-200">
-            {currentRows.map((row, idx) => (
-              <tr key={startIndex + idx} className="hover:bg-slate-50 transition-colors">
-                <td className="px-6 py-4 whitespace-nowrap font-medium text-slate-900">{row.num_conteneur}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-slate-600">
-                    {row.taille_conteneur === 0 ? (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200">
-                            Unknown
-                        </span>
-                    ) : (
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            row.taille_conteneur === 20 ? 'bg-green-100 text-green-800' : 
-                            row.taille_conteneur === 40 ? 'bg-blue-100 text-blue-800' : 
-                            'bg-purple-100 text-purple-800'
-                        }`}>
-                            {row.taille_conteneur}'
-                        </span>
-                    )}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-slate-600">{row.code_iso}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-slate-600">{row.statut}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-slate-600 font-mono text-xs">{row.num_bl}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-slate-600 truncate max-w-xs" title={row.client_final}>{row.client_final}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-slate-600">
-                    {row.indicateur_groupage === '1' ? (
-                        <span className="text-orange-600 font-bold text-xs">LCL / PART</span>
-                    ) : (
-                        <span className="text-slate-400 text-xs">FCL</span>
-                    )}
-                </td>
-              </tr>
-            ))}
+            {currentRows.map((row, idx) => {
+              const isReefer = row.indicateur_reefer === '1';
+              const isImdg = !!row.classe_imdg;
+
+              return (
+                <tr key={startIndex + idx} className="hover:bg-slate-50 transition-colors group">
+                  <td className="px-6 py-3 whitespace-nowrap">
+                    <ContainerSizeBadge size={row.taille_conteneur} />
+                  </td>
+                  <td className="px-6 py-3 whitespace-nowrap">
+                    <span className="font-mono font-bold text-slate-700">{row.num_conteneur}</span>
+                  </td>
+                  <td className="px-6 py-3 whitespace-nowrap text-slate-500 font-mono text-xs">{row.code_iso}</td>
+                  <td className="px-6 py-3 whitespace-nowrap">
+                    <div className="flex items-center gap-2">
+                      {isReefer && (
+                        <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-cyan-50 border border-cyan-100 text-cyan-700" title="Reefer Container">
+                          <Snowflake className="h-3 w-3" />
+                          <span className="text-[10px] font-bold">REEFER</span>
+                        </div>
+                      )}
+                      {isImdg && (
+                        <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-50 border border-red-100 text-red-700" title={`IMDG Class ${row.classe_imdg}`}>
+                          <Flame className="h-3 w-3" />
+                          <span className="text-[10px] font-bold">IMDG</span>
+                        </div>
+                      )}
+                      {!isReefer && !isImdg && (
+                        <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-50 border border-slate-100 text-slate-500" title="Standard Dry Container">
+                          <Package className="h-3 w-3" />
+                          <span className="text-[10px] font-bold">DRY</span>
+                        </div>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-6 py-3 whitespace-nowrap">
+                    <span className="px-2 py-1 bg-slate-100 text-slate-600 text-xs rounded font-medium">{row.statut || 'FCL'}</span>
+                  </td>
+                  <td className="px-6 py-3 whitespace-nowrap text-slate-600 font-mono text-xs">{row.num_bl}</td>
+                  <td className="px-6 py-3 whitespace-nowrap text-slate-600 truncate max-w-xs text-xs" title={row.client_final}>{row.client_final}</td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -139,8 +154,8 @@ export const DataTable: React.FC<DataTableProps> = ({ rows }) => {
           </div>
           <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
             <div>
-              <p className="text-sm text-slate-700">
-                Page <span className="font-medium">{currentPage}</span> of <span className="font-medium">{totalPages}</span>
+              <p className="text-xs text-slate-500">
+                Page <span className="font-medium text-slate-700">{currentPage}</span> of <span className="font-medium text-slate-700">{totalPages}</span>
               </p>
             </div>
             <div>
@@ -153,7 +168,7 @@ export const DataTable: React.FC<DataTableProps> = ({ rows }) => {
                   }`}
                 >
                   <span className="sr-only">Previous</span>
-                  <ChevronLeft className="h-5 w-5" />
+                  <ChevronLeft className="h-4 w-4" />
                 </button>
                 <button
                   onClick={handleNext}
@@ -163,7 +178,7 @@ export const DataTable: React.FC<DataTableProps> = ({ rows }) => {
                   }`}
                 >
                   <span className="sr-only">Next</span>
-                  <ChevronRight className="h-5 w-5" />
+                  <ChevronRight className="h-4 w-4" />
                 </button>
               </nav>
             </div>

@@ -1,3 +1,4 @@
+
 export interface Container {
   num_conteneur: string;
   taille_conteneur: number | string; // Can come in as string in some bad JSONs, we handle it
@@ -87,6 +88,7 @@ export interface AnalyticsStats {
   countUnknownSize: number;
   countIMDG: number;
   countReefer: number;
+  countErrors: number; // Data quality errors
 }
 
 // Analysis Structures
@@ -115,9 +117,18 @@ export interface SpecialCargoContainer {
   is_active_reefer?: boolean; // Derived from flag
 }
 
+export interface ContainerError {
+  num_conteneur: string;
+  taille_conteneur: number;
+  code_iso: string;
+  bls: BLInfo[];
+  reasons: string[]; // List of what's wrong (e.g. "Missing ISO", "Unknown Size")
+}
+
 export interface AnalysisResult {
   stats: AnalyticsStats;
   lclContainers: LCLContainer[];
   imdgContainers: SpecialCargoContainer[];
   reeferContainers: SpecialCargoContainer[];
+  errorContainers: ContainerError[];
 }

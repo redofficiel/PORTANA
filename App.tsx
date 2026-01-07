@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+
+import React, { useState, useMemo } from 'react';
 import { Header } from './components/Header';
 import { FileUpload } from './components/FileUpload';
 import { StatCard } from './components/StatCard';
@@ -6,11 +7,17 @@ import { DataTable } from './components/DataTable';
 import { ManifestDetails } from './components/ManifestDetails';
 import { LCLAnalysisPanel } from './components/LCLAnalysisPanel';
 import { SpecialCargoPanel } from './components/SpecialCargoPanel';
-import { validateManifestJson, flattenManifestData, analyzeManifestData, downloadXlsx } from './utils/manifestService';
-import { ContainerRow, AnalyticsStats, Manifest, LCLContainer, SpecialCargoContainer } from './types';
-import { Box, Layers, Container, FileSpreadsheet, RefreshCw, AlertTriangle, HelpCircle, Flame, Snowflake, LayoutDashboard } from 'lucide-react';
+import { ErrorAnalysisPanel } from './components/ErrorAnalysisPanel';
+import { ContainerSizeBadge } from './components/ContainerBadges';
+import { 
+  validateManifestJson, flattenManifestData, analyzeManifestData, 
+  downloadXlsx, downloadLCLReport, downloadSpecialCargoReport, downloadErrorReport 
+} from './utils/manifestService';
+import { ContainerRow, AnalyticsStats, Manifest, LCLContainer, SpecialCargoContainer, ContainerError } from './types';
+import { Layers, FileSpreadsheet, RefreshCw, AlertTriangle, Flame, Snowflake, LayoutDashboard, FilterX, FileWarning } from 'lucide-react';
 
-type TabMode = 'OVERVIEW' | 'LCL' | 'IMDG' | 'REEFER';
+type TabMode = 'OVERVIEW' | 'LCL' | 'IMDG' | 'REEFER' | 'ERRORS';
+type SizeFilter = 20 | 40 | 45 | 'UNKNOWN' | null;
 
 const App: React.FC = () => {
   // Data State
@@ -22,12 +29,14 @@ const App: React.FC = () => {
   const [lclData, setLclData] = useState<LCLContainer[]>([]);
   const [imdgData, setImdgData] = useState<SpecialCargoContainer[]>([]);
   const [reeferData, setReeferData] = useState<SpecialCargoContainer[]>([]);
+  const [errorData, setErrorData] = useState<ContainerError[]>([]);
 
   // UI State
   const [fileName, setFileName] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<TabMode>('OVERVIEW');
+  const [sizeFilter, setSizeFilter] = useState<SizeFilter>(null);
 
   // Handlers
   const handleFileProcess = async (file: File) => {
@@ -39,8 +48,10 @@ const App: React.FC = () => {
     setLclData([]);
     setImdgData([]);
     setReeferData([]);
+    setErrorData([]);
     setFileName(file.name);
     setActiveTab('OVERVIEW'); 
+    setSizeFilter(null);
 
     try {
       const text = await file.text();
@@ -62,7 +73,7 @@ const App: React.FC = () => {
       }
 
       // 3. Analytics
-      const { stats: computedStats, lclContainers, imdgContainers, reeferContainers } = analyzeManifestData(flattenedRows);
+      const { stats: computedStats, lclContainers, imdgContainers, reeferContainers, errorContainers } = analyzeManifestData(flattenedRows);
 
       // Update State
       setData(flattenedRows);
@@ -70,6 +81,7 @@ const App: React.FC = () => {
       setLclData(lclContainers);
       setImdgData(imdgContainers);
       setReeferData(reeferContainers);
+      setErrorData(errorContainers);
       setManifestHeader(manifests[0]);
     } catch (err: any) {
       setError(err.message || "An unexpected error occurred during processing.");
@@ -91,10 +103,20 @@ const App: React.FC = () => {
     setLclData([]);
     setImdgData([]);
     setReeferData([]);
+    setErrorData([]);
     setError(null);
     setFileName('');
     setActiveTab('OVERVIEW');
+    setSizeFilter(null);
   };
+
+  // Filter Data Logic for Overview Table
+  const filteredRows = useMemo(() => {
+    if (!data) return [];
+    if (sizeFilter === null) return data;
+    if (sizeFilter === 'UNKNOWN') return data.filter(r => r.taille_conteneur !== 20 && r.taille_conteneur !== 40 && r.taille_conteneur !== 45);
+    return data.filter(r => r.taille_conteneur === sizeFilter);
+  }, [data, sizeFilter]);
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900 pb-20">
@@ -173,6 +195,21 @@ const App: React.FC = () => {
                   Overview
                 </button>
                 
+                {stats.countErrors > 0 && (
+                  <button
+                    onClick={() => setActiveTab('ERRORS')}
+                    className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+                      activeTab === 'ERRORS' 
+                        ? 'border-rose-500 text-rose-700' 
+                        : 'border-transparent text-slate-500 hover:text-rose-600 hover:border-rose-200'
+                    }`}
+                  >
+                    <FileWarning className="h-4 w-4" />
+                    Anomalies
+                    <span className="bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded-full text-[10px] font-bold">{stats.countErrors}</span>
+                  </button>
+                )}
+
                 {stats.countLCL > 0 && (
                   <button
                     onClick={() => setActiveTab('LCL')}
@@ -208,13 +245,13 @@ const App: React.FC = () => {
                     onClick={() => setActiveTab('REEFER')}
                     className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                       activeTab === 'REEFER' 
-                        ? 'border-blue-500 text-blue-700' 
-                        : 'border-transparent text-slate-500 hover:text-blue-600 hover:border-blue-200'
+                        ? 'border-cyan-500 text-cyan-700' 
+                        : 'border-transparent text-slate-500 hover:text-cyan-600 hover:border-cyan-200'
                     }`}
                   >
                     <Snowflake className="h-4 w-4" />
                     Reefer Containers
-                    <span className="bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded-full text-[10px]">{stats.countReefer}</span>
+                    <span className="bg-cyan-50 text-cyan-600 px-1.5 py-0.5 rounded-full text-[10px]">{stats.countReefer}</span>
                   </button>
                 )}
               </div>
@@ -223,61 +260,112 @@ const App: React.FC = () => {
               <div className="min-h-[400px]">
                 {activeTab === 'OVERVIEW' && (
                   <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                    <ManifestDetails data={manifestHeader} />
                     
-                    {/* Summary Cards */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                    {/* Container Overview Strip */}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-2">
                        <StatCard 
-                          title="Total 20'" 
-                          value={stats.count20} 
-                          icon={<Box className="h-5 w-5 text-slate-600" />} 
-                          colorClass="bg-slate-100"
+                          label="20' Containers" 
+                          count={stats.count20} 
+                          icon={<ContainerSizeBadge size={20} className="scale-75 origin-left" />}
+                          colorTheme="gray"
+                          active={sizeFilter === 20}
+                          onClick={() => setSizeFilter(sizeFilter === 20 ? null : 20)}
                         />
                         <StatCard 
-                          title="Total 40'" 
-                          value={stats.count40} 
-                          icon={<Container className="h-5 w-5 text-slate-600" />} 
-                          colorClass="bg-slate-100"
+                          label="40' Containers" 
+                          count={stats.count40} 
+                          icon={<ContainerSizeBadge size={40} className="scale-75 origin-left" />}
+                          colorTheme="teal"
+                          active={sizeFilter === 40}
+                          onClick={() => setSizeFilter(sizeFilter === 40 ? null : 40)}
                         />
                         <StatCard 
-                          title="Total 45'" 
-                          value={stats.count45} 
-                          icon={<Container className="h-5 w-5 text-slate-600" />} 
-                          colorClass="bg-slate-100"
+                          label="45' Containers" 
+                          count={stats.count45} 
+                          icon={<ContainerSizeBadge size={45} className="scale-75 origin-left" />}
+                          colorTheme="navy"
+                          active={sizeFilter === 45}
+                          onClick={() => setSizeFilter(sizeFilter === 45 ? null : 45)}
+                        />
+                        <StatCard 
+                          label="Reefer Units" 
+                          count={stats.countReefer} 
+                          icon={<Snowflake className="h-4 w-4 text-cyan-600" />} 
+                          colorTheme="blue"
+                          active={activeTab === 'REEFER'}
+                          onClick={() => setActiveTab('REEFER')}
+                        />
+                        <StatCard 
+                          label="IMDG Cargo" 
+                          count={stats.countIMDG} 
+                          icon={<Flame className="h-4 w-4 text-red-600" />} 
+                          colorTheme="red"
+                          active={activeTab === 'IMDG'}
+                          onClick={() => setActiveTab('IMDG')}
                         />
                          <StatCard 
-                          title="Unknown" 
-                          value={stats.countUnknownSize} 
-                          icon={<HelpCircle className="h-5 w-5 text-slate-400" />} 
-                          colorClass="bg-slate-50"
+                          label="LCL Groups" 
+                          count={stats.countLCL} 
+                          icon={<Layers className="h-4 w-4 text-orange-600" />} 
+                          colorTheme="orange"
+                          active={activeTab === 'LCL'}
+                          onClick={() => setActiveTab('LCL')}
                         />
                     </div>
+                    
+                    {/* Helper text for filters */}
+                    {sizeFilter && (
+                      <div className="flex items-center justify-between bg-slate-100 border border-slate-200 px-3 py-2 rounded text-xs text-slate-600 animate-in fade-in">
+                        <span className="font-semibold">Filtered by Size: {sizeFilter === 'UNKNOWN' ? 'Unknown' : `${sizeFilter}'`}</span>
+                        <button onClick={() => setSizeFilter(null)} className="flex items-center gap-1 hover:text-slate-900">
+                          <FilterX className="h-3 w-3" /> Clear Filter
+                        </button>
+                      </div>
+                    )}
 
-                    <div className="bg-white rounded-lg border border-slate-200 p-4">
-                       <div className="mb-4 flex items-center justify-between">
-                          <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wide">All Containers</h3>
-                          <span className="text-xs text-slate-500">Total Unique Units: {stats.totalContainers}</span>
-                       </div>
-                       <DataTable rows={data} />
+                    <ManifestDetails data={manifestHeader} />
+
+                    <div className="bg-white rounded-lg border border-slate-200 p-0 overflow-hidden">
+                       <DataTable rows={filteredRows} />
                     </div>
+                  </div>
+                )}
+
+                {activeTab === 'ERRORS' && (
+                  <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+                     <ErrorAnalysisPanel 
+                        errors={errorData} 
+                        onExport={() => downloadErrorReport(errorData, fileName)} 
+                     />
                   </div>
                 )}
 
                 {activeTab === 'LCL' && (
                   <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-                    <LCLAnalysisPanel lclContainers={lclData} />
+                    <LCLAnalysisPanel 
+                        lclContainers={lclData} 
+                        onExport={() => downloadLCLReport(lclData, fileName)} 
+                    />
                   </div>
                 )}
 
                 {activeTab === 'IMDG' && (
                   <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-                    <SpecialCargoPanel type="IMDG" containers={imdgData} />
+                    <SpecialCargoPanel 
+                        type="IMDG" 
+                        containers={imdgData} 
+                        onExport={() => downloadSpecialCargoReport(imdgData, 'IMDG', fileName)} 
+                    />
                   </div>
                 )}
 
                 {activeTab === 'REEFER' && (
                   <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-                    <SpecialCargoPanel type="REEFER" containers={reeferData} />
+                    <SpecialCargoPanel 
+                        type="REEFER" 
+                        containers={reeferData} 
+                        onExport={() => downloadSpecialCargoReport(reeferData, 'REEFER', fileName)} 
+                    />
                   </div>
                 )}
               </div>
