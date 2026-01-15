@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Manifest } from '../types';
 import { 
@@ -40,14 +41,14 @@ export const ManifestDetails: React.FC<ManifestDetailsProps> = ({ data }) => {
     <div className="bg-white rounded-lg shadow-sm border border-slate-200 mb-6">
       <div className="px-5 py-3 border-b border-slate-100 flex items-center gap-2 bg-slate-50/50">
         <Info className="h-4 w-4 text-slate-400" />
-        <h3 className="font-semibold text-slate-700 text-sm uppercase tracking-wide">Vessel & Voyage Reference</h3>
+        <h3 className="font-semibold text-slate-700 text-sm uppercase tracking-wide">Référence Navire & Voyage</h3>
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-y-2 gap-x-6 p-4">
         {/* Column 1: Vessel */}
         <div className="space-y-1 border-r border-slate-100 last:border-0 pr-4">
             <DetailItem 
-                label="Nom du navire" 
+                label="Nom du Navire" 
                 value={data.nom_navire} 
                 subValue={data.call_sign}
                 icon={Ship} 
@@ -62,12 +63,12 @@ export const ManifestDetails: React.FC<ManifestDetailsProps> = ({ data }) => {
         {/* Column 2: Voyage */}
         <div className="space-y-1 border-r border-slate-100 last:border-0 pr-4">
             <DetailItem 
-                label="Escale Reference" 
+                label="Référence Escale" 
                 value={data.numero_escale} 
                 icon={MapPin} 
             />
             <DetailItem 
-                label="Num Voyage / Gros" 
+                label="N° Voyage / Gros" 
                 value={data.num_voyage} 
                 subValue={data.num_gros}
                 icon={FileText} 

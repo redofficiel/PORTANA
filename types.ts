@@ -20,6 +20,7 @@ export interface Container {
 export interface Connaissement {
   num_bl: string;
   article?: string;
+  description_marchandise?: string; // Alternative common field name for goods description
   port_chargement?: string;
   client_final?: string;
   nif_client_final?: string;
@@ -61,6 +62,7 @@ export interface ContainerRow {
   port_chargement: string;
   client_final: string;
   nif_client_final: string;
+  marchandise: string; // Nature de la marchandise (BL article)
 
   // Container Level
   num_conteneur: string;
@@ -78,6 +80,13 @@ export interface ContainerRow {
   code_un: string;
 }
 
+// Record structure for APCS Reconciliation
+export interface ApcsRecord {
+  containerNum: string;
+  rawLine: string;
+  date?: string;
+}
+
 export interface AnalyticsStats {
   totalContainers: number; // Unique physical containers
   count20: number;
@@ -86,9 +95,17 @@ export interface AnalyticsStats {
   countLCL: number; // Multi-BL containers
   countFCL: number; // Single-BL containers
   countUnknownSize: number;
+  
+  // Special Cargo Totals
   countIMDG: number;
   countReefer: number;
   countErrors: number; // Data quality errors
+
+  // Detailed Breakdowns
+  countReefer20: number;
+  countReefer40: number; // Includes 45 if treated as broad category, but we'll count strict 40 here based on request
+  countIMDG20: number;
+  countIMDG40: number;
 }
 
 // Analysis Structures
@@ -109,6 +126,7 @@ export interface SpecialCargoContainer {
   taille_conteneur: number;
   code_iso: string;
   bls: BLInfo[];
+  marchandise?: string; // Added to trace detection context
   // IMDG specific
   classe_imdg?: string;
   code_un?: string;
@@ -131,4 +149,16 @@ export interface AnalysisResult {
   imdgContainers: SpecialCargoContainer[];
   reeferContainers: SpecialCargoContainer[];
   errorContainers: ContainerError[];
+}
+
+// Historical Record for Persistence
+export interface VesselRecord {
+  id: string; // Unique Identifier (IMO + Voyage + Date)
+  uploadDate: string; // ISO Timestamp of upload
+  manifest: Manifest; // Header info
+  stats: AnalyticsStats; // Pre-calculated stats
+  // We store the full raw JSON to allow re-analysis later, 
+  // though in a real DB we might store this differently.
+  rawRows: ContainerRow[]; 
+  originalFileName: string;
 }

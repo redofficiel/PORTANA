@@ -1,3 +1,4 @@
+
 import React from 'react';
 
 interface StatCardProps {
@@ -18,13 +19,48 @@ export const StatCard: React.FC<StatCardProps> = ({
   colorTheme = 'gray' 
 }) => {
   
-  const themeStyles = {
-    gray:   active ? 'border-slate-600 bg-slate-50' : 'border-slate-200 hover:border-slate-300 bg-white',
-    teal:   active ? 'border-teal-600 bg-teal-50' : 'border-teal-100 hover:border-teal-300 bg-white',
-    navy:   active ? 'border-indigo-900 bg-indigo-50' : 'border-indigo-100 hover:border-indigo-300 bg-white',
-    blue:   active ? 'border-cyan-600 bg-cyan-50' : 'border-cyan-100 hover:border-cyan-300 bg-white',
-    red:    active ? 'border-red-600 bg-red-50' : 'border-red-100 hover:border-red-300 bg-white',
-    orange: active ? 'border-orange-500 bg-orange-50' : 'border-orange-100 hover:border-orange-300 bg-white',
+  const isInteractive = !!onClick;
+
+  const getThemeClasses = () => {
+    // Base styles for active state
+    if (active) {
+      switch (colorTheme) {
+        case 'gray': return 'border-slate-600 bg-slate-50';
+        case 'teal': return 'border-teal-600 bg-teal-50';
+        case 'navy': return 'border-indigo-900 bg-indigo-50';
+        case 'blue': return 'border-cyan-600 bg-cyan-50';
+        case 'red':  return 'border-red-600 bg-red-50';
+        case 'orange': return 'border-orange-500 bg-orange-50';
+        default: return 'border-slate-600 bg-slate-50';
+      }
+    }
+
+    // Styles for inactive state (interactive vs static)
+    const hoverClass = isInteractive ? 'hover:border-slate-300' : '';
+    const base = `bg-white border-slate-200 ${isInteractive ? hoverClass : ''}`;
+
+    // Specific hover overrides if needed, currently we use a generic hover for inactive items
+    // but we can colorize borders on hover if we want. For now, sticking to clean slate border.
+    if (isInteractive) {
+        switch (colorTheme) {
+            case 'teal': return `bg-white border-teal-100 hover:border-teal-300`;
+            case 'navy': return `bg-white border-indigo-100 hover:border-indigo-300`;
+            case 'blue': return `bg-white border-cyan-100 hover:border-cyan-300`;
+            case 'red':  return `bg-white border-red-100 hover:border-red-300`;
+            case 'orange': return `bg-white border-orange-100 hover:border-orange-300`;
+            default: return `bg-white border-slate-200 hover:border-slate-300`;
+        }
+    }
+
+    // Non-interactive (Static)
+    switch (colorTheme) {
+        case 'teal': return `bg-white border-teal-100`;
+        case 'navy': return `bg-white border-indigo-100`;
+        case 'blue': return `bg-white border-cyan-100`;
+        case 'red':  return `bg-white border-red-100`;
+        case 'orange': return `bg-white border-orange-100`;
+        default: return `bg-white border-slate-200`;
+    }
   };
 
   const textColors = {
@@ -38,11 +74,12 @@ export const StatCard: React.FC<StatCardProps> = ({
 
   return (
     <div
-      onClick={onClick}
+      onClick={isInteractive ? onClick : undefined}
       className={`
-        relative flex flex-col items-center justify-center p-3 rounded-lg border shadow-sm cursor-pointer transition-all duration-200
+        relative flex flex-col items-center justify-center p-3 rounded-lg border shadow-sm transition-all duration-200
         min-w-[100px] flex-1
-        ${themeStyles[colorTheme]}
+        ${isInteractive ? 'cursor-pointer' : 'cursor-default'}
+        ${getThemeClasses()}
       `}
     >
       <div className="flex items-center gap-2 mb-1">

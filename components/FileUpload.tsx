@@ -1,8 +1,9 @@
+
 import React, { useRef, useState } from 'react';
-import { Upload, FileJson, AlertCircle } from 'lucide-react';
+import { Upload, FileJson, AlertCircle, Files } from 'lucide-react';
 
 interface FileUploadProps {
-  onFileProcess: (file: File) => void;
+  onFileProcess: (files: File[]) => void;
   isLoading: boolean;
 }
 
@@ -14,13 +15,17 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFileProcess, isLoading
     e.preventDefault();
     setIsDragOver(false);
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      onFileProcess(e.dataTransfer.files[0]);
+      // Convert FileList to Array
+      const filesArray = Array.from(e.dataTransfer.files);
+      onFileProcess(filesArray);
     }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      onFileProcess(e.target.files[0]);
+      // Convert FileList to Array
+      const filesArray = Array.from(e.target.files);
+      onFileProcess(filesArray);
     }
   };
 
@@ -41,6 +46,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFileProcess, isLoading
           ref={inputRef}
           className="hidden"
           accept="application/json"
+          multiple // Allow multiple files
           onChange={handleChange}
         />
         
@@ -49,18 +55,21 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFileProcess, isLoading
             {isLoading ? (
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
             ) : (
-              <Upload className="h-8 w-8" />
+              <Files className="h-8 w-8" />
             )}
           </div>
           
           <div>
-            <h3 className="text-lg font-semibold text-slate-800">Upload Manifest File</h3>
-            <p className="text-slate-500 mt-1 text-sm">Drag and drop your JSON manifest file here, or click to browse.</p>
+            <h3 className="text-lg font-semibold text-slate-800">Téléversement des Manifestes</h3>
+            <p className="text-slate-500 mt-1 text-sm">
+                Glissez-déposez vos fichiers JSON ici, ou cliquez pour parcourir.
+            </p>
+            <p className="text-xs text-slate-400 mt-2">Vous pouvez sélectionner plusieurs fichiers à la fois.</p>
           </div>
 
           <div className="flex items-center gap-2 text-xs text-slate-400 bg-slate-50 px-3 py-1 rounded-full border border-slate-200">
             <FileJson className="h-3 w-3" />
-            <span>Expected format: JSON (Manifest &rarr; Connaissements &rarr; Conteneurs)</span>
+            <span>Format attendu : JSON</span>
           </div>
         </div>
       </div>

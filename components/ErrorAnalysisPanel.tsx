@@ -17,19 +17,19 @@ export const ErrorAnalysisPanel: React.FC<ErrorAnalysisPanelProps> = ({ errors, 
       <div className="px-6 py-4 border-b border-slate-200 bg-rose-50 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <AlertTriangle className="h-5 w-5 text-rose-600" />
-          <h3 className="font-bold text-slate-800 text-lg">Data Anomalies & Errors</h3>
+          <h3 className="font-bold text-slate-800 text-lg">Anomalies & Erreurs de Données</h3>
         </div>
         <div className="flex items-center gap-3">
             <span className="bg-rose-100 text-rose-800 text-xs font-bold px-3 py-1 rounded-full border border-rose-200">
-            {errors.length} Issues Detected
+            {errors.length} Problèmes Détectés
             </span>
             <button 
                 onClick={onExport}
                 className="flex items-center gap-2 px-3 py-1.5 bg-white border border-slate-300 rounded text-xs font-bold text-slate-700 hover:bg-slate-50 hover:text-rose-700 transition-colors"
-                title="Download Anomalies Report"
+                title="Télécharger le rapport d'anomalies"
             >
                 <Download className="h-3.5 w-3.5" />
-                Export List
+                Exporter Liste
             </button>
         </div>
       </div>
@@ -60,7 +60,7 @@ const ErrorCard: React.FC<{ container: ContainerError }> = ({ container }) => {
           </div>
           <div>
             <p className="text-sm font-semibold text-slate-900 font-mono tracking-wide">
-              {container.num_conteneur && container.num_conteneur !== 'UNKNOWN' ? container.num_conteneur : <span className="text-red-500 italic">Unknown Number</span>}
+              {container.num_conteneur && container.num_conteneur !== 'INCONNU' && container.num_conteneur !== 'UNKNOWN' ? container.num_conteneur : <span className="text-red-500 italic">Numéro Inconnu</span>}
             </p>
             <div className="flex items-center gap-2 mt-2">
                {/* Display Badges for Reasons */}
@@ -76,13 +76,13 @@ const ErrorCard: React.FC<{ container: ContainerError }> = ({ container }) => {
         <div className="flex items-center gap-4 mt-3 sm:mt-0">
           <div className="text-right hidden sm:block">
              <div className="flex items-center gap-2 justify-end mb-1">
-                <span className="text-xs text-slate-500">Declared Size:</span>
+                <span className="text-xs text-slate-500">Taille Déclarée:</span>
                 <ContainerSizeBadge size={container.taille_conteneur} />
              </div>
              <div className="flex items-center gap-2 justify-end">
                 <span className="text-xs text-slate-500">ISO:</span>
                 <span className={`font-mono text-xs font-bold ${!container.code_iso ? 'text-red-500' : 'text-slate-700'}`}>
-                    {container.code_iso || 'EMPTY'}
+                    {container.code_iso || 'VIDE'}
                 </span>
              </div>
           </div>
@@ -96,9 +96,9 @@ const ErrorCard: React.FC<{ container: ContainerError }> = ({ container }) => {
            <table className="min-w-full text-sm">
              <thead>
                <tr className="text-left text-xs font-medium text-slate-500 uppercase tracking-wider border-b border-slate-100">
-                 <th className="pb-2 pl-2">BL Number</th>
+                 <th className="pb-2 pl-2">N° BL</th>
                  <th className="pb-2">Client Final</th>
-                 <th className="pb-2 text-right">Weight (Kg)</th>
+                 <th className="pb-2 text-right">Poids (Kg)</th>
                </tr>
              </thead>
              <tbody className="divide-y divide-slate-50">

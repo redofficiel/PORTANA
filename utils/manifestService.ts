@@ -7,22 +7,22 @@ import * as XLSX from 'xlsx';
  */
 export const validateManifestJson = (data: any): Manifest[] => {
   if (!Array.isArray(data)) {
-    throw new Error("Invalid Format: Root element must be an array of Manifest objects.");
+    throw new Error("Format Invalide : L'élément racine doit être un tableau d'objets Manifeste.");
   }
 
   if (data.length === 0) {
-    throw new Error("Invalid Format: The manifest array is empty.");
+    throw new Error("Format Invalide : Le tableau du manifeste est vide.");
   }
 
   // Check first item to see if it looks like a manifest
   const firstItem = data[0];
   if (!firstItem || typeof firstItem !== 'object') {
-     throw new Error("Invalid Format: Manifest items must be objects.");
+     throw new Error("Format Invalide : Les éléments du manifeste doivent être des objets.");
   }
 
   // Loose check for mandatory fields on the first item to fail fast
   if (!('connaissements' in firstItem) && !('numero_escale' in firstItem)) {
-    throw new Error("Invalid Format: Missing key manifest fields (numero_escale or connaissements).");
+    throw new Error("Format Invalide : Champs clés manquants (numero_escale ou connaissements).");
   }
 
   return data as Manifest[];
@@ -30,21 +30,33 @@ export const validateManifestJson = (data: any): Manifest[] => {
 
 /**
  * Flattens the hierarchical Manifest -> BL -> Container structure into a flat array.
+ * Includes automatic detection of Dangerous Goods based on commodity description text.
  */
 export const flattenManifestData = (manifests: Manifest[]): ContainerRow[] => {
   const rows: ContainerRow[] = [];
+  
+  // Regex to detect dangerous goods keywords in text
+  // Matches "DGX", "DANGEROUS", "HAZ", "IMO" (case insensitive, whole words or distinct segments)
+  const dgRegex = /\b(DGX|DANGEROUS|HAZ|IMO|HAZMAT)\b/i;
 
   manifests.forEach((manifest, mIdx) => {
     // Safety check for connaissements array
     const bls = Array.isArray(manifest.connaissements) ? manifest.connaissements : [];
 
     if (bls.length === 0) {
-      console.warn(`Manifest at index ${mIdx} (Escale: ${manifest.numero_escale}) has no BLs.`);
+      console.warn(`Manifeste à l'index ${mIdx} (Escale: ${manifest.numero_escale}) sans connaissements.`);
     }
 
     bls.forEach((bl) => {
       // Safety check for conteneurs array
       const containers = Array.isArray(bl.conteneurs) ? bl.conteneurs : [];
+
+      // Determine commodity description (support multiple field names)
+      // Prioritize description_marchandise, then article.
+      const commodity = bl.description_marchandise || bl.article || '';
+      
+      // Check if commodity implies dangerous goods
+      const isTextDetectedIMDG = dgRegex.test(commodity);
 
       containers.forEach((cnt) => {
         // Refined size normalization logic
@@ -54,6 +66,16 @@ export const flattenManifestData = (manifests: Manifest[]): ContainerRow[] => {
         }
         if (isNaN(size)) {
             size = 0;
+        }
+
+        // Robust parsing for IMDG fields (handle numbers/strings/nulls)
+        let rawImdgClass = cnt.classe_imdg !== undefined ? cnt.classe_imdg : (cnt as any).imdg_class;
+        const rawUnCode = cnt.code_un !== undefined ? cnt.code_un : (cnt as any).un_number;
+
+        // --- IMDG DETECTION LOGIC ---
+        // If no explicit class/UN is provided, but text says "DGX", we force it.
+        if (!rawImdgClass && !rawUnCode && isTextDetectedIMDG) {
+            rawImdgClass = "DÉTECTÉ (DGX)";
         }
 
         const row: ContainerRow = {
@@ -70,9 +92,10 @@ export const flattenManifestData = (manifests: Manifest[]): ContainerRow[] => {
           port_chargement: bl.port_chargement || '',
           client_final: bl.client_final || '',
           nif_client_final: bl.nif_client_final || '',
+          marchandise: commodity,
 
           // Container Fields
-          num_conteneur: cnt.num_conteneur || 'UNKNOWN',
+          num_conteneur: cnt.num_conteneur || 'INCONNU',
           taille_conteneur: size,
           code_iso: cnt.code_iso || '',
           indicateur_groupage: cnt.indicateur_groupage || '0',
@@ -84,9 +107,10 @@ export const flattenManifestData = (manifests: Manifest[]): ContainerRow[] => {
           // Explicitly cast to string to handle numeric 1/0 in JSON safely
           indicateur_reefer: cnt.indicateur_reefer !== undefined ? String(cnt.indicateur_reefer) : '0',
           temperature: cnt.temperature ? String(cnt.temperature) : '',
-          // Check common IMDG keys
-          classe_imdg: cnt.classe_imdg || (cnt as any).imdg_class || '',
-          code_un: cnt.code_un || (cnt as any).un_number || '',
+          
+          // IMDG: Convert to string if present (handles numbers like 3 or 9)
+          classe_imdg: rawImdgClass ? String(rawImdgClass) : '',
+          code_un: rawUnCode ? String(rawUnCode) : '',
         };
 
         rows.push(row);
@@ -109,6 +133,7 @@ export const analyzeManifestData = (rows: ContainerRow[]): AnalysisResult => {
     temp: string;
     imdgClass: string;
     unCode: string;
+    commodity: string; // Store primary commodity for detection evidence
     bls: Map<string, { client: string, weight: number }>;
   }>();
 
@@ -125,6 +150,7 @@ export const analyzeManifestData = (rows: ContainerRow[]): AnalysisResult => {
         temp: row.temperature,
         imdgClass: row.classe_imdg,
         unCode: row.code_un,
+        commodity: row.marchandise,
         bls: new Map()
       });
     }
@@ -136,6 +162,9 @@ export const analyzeManifestData = (rows: ContainerRow[]): AnalysisResult => {
     if (!entry.unCode && row.code_un) entry.unCode = row.code_un;
     if (!entry.reeferFlag && row.indicateur_reefer === '1') entry.reeferFlag = true;
     if (!entry.temp && row.temperature) entry.temp = row.temperature;
+    
+    // Fallback commodity if first was empty
+    if (!entry.commodity && row.marchandise) entry.commodity = row.marchandise;
 
     // Track unique BLs
     if (!entry.bls.has(row.num_bl)) {
@@ -154,6 +183,12 @@ export const analyzeManifestData = (rows: ContainerRow[]): AnalysisResult => {
   let cUnknown = 0;
   let fcl = 0;
   let lcl = 0;
+
+  // Detailed Counters
+  let rf20 = 0;
+  let rf40 = 0;
+  let im20 = 0;
+  let im40 = 0;
   
   const lclList: LCLContainer[] = [];
   const imdgList: SpecialCargoContainer[] = [];
@@ -188,35 +223,46 @@ export const analyzeManifestData = (rows: ContainerRow[]): AnalysisResult => {
     }
 
     // 2. IMDG Logic
+    // Check if either Class OR UN Code is present
     if (data.imdgClass || data.unCode) {
+      // Stats Breakdown
+      if (data.size === 20) im20++;
+      if (data.size === 40 || data.size === 45) im40++; 
+      
       imdgList.push({
         num_conteneur: num,
         taille_conteneur: data.size,
         code_iso: data.iso,
         bls: blList,
         classe_imdg: data.imdgClass,
-        code_un: data.unCode
+        code_un: data.unCode,
+        marchandise: data.commodity
       });
     }
 
     // 3. Reefer Logic
     const isReefer = data.reeferFlag || (data.iso && data.iso.toUpperCase().startsWith('R'));
     if (isReefer) {
+      // Stats Breakdown
+      if (data.size === 20) rf20++;
+      if (data.size === 40 || data.size === 45) rf40++; 
+
       reeferList.push({
         num_conteneur: num,
         taille_conteneur: data.size,
         code_iso: data.iso,
         bls: blList,
         temperature: data.temp,
-        is_active_reefer: data.reeferFlag
+        is_active_reefer: data.reeferFlag,
+        marchandise: data.commodity
       });
     }
 
     // 4. Error / Anomaly Logic
     const reasons: string[] = [];
-    if (!data.iso || data.iso.trim() === '') reasons.push('Missing ISO Type');
-    if (data.size === 0) reasons.push('Unknown Size');
-    if (!num || num === 'UNKNOWN') reasons.push('Invalid Number');
+    if (!data.iso || data.iso.trim() === '') reasons.push('Type ISO Manquant');
+    if (data.size === 0) reasons.push('Taille Inconnue');
+    if (!num || num === 'UNKNOWN' || num === 'INCONNU') reasons.push('Numéro Invalide');
 
     if (reasons.length > 0) {
       errorList.push({
@@ -249,13 +295,30 @@ export const analyzeManifestData = (rows: ContainerRow[]): AnalysisResult => {
       countUnknownSize: cUnknown,
       countIMDG: imdgList.length,
       countReefer: reeferList.length,
-      countErrors: errorList.length
+      countErrors: errorList.length,
+      // Detailed
+      countReefer20: rf20,
+      countReefer40: rf40,
+      countIMDG20: im20,
+      countIMDG40: im40
     },
     lclContainers: lclList,
     imdgContainers: imdgList,
     reeferContainers: reeferList,
     errorContainers: errorList
   };
+};
+
+/**
+ * Generates a unique ID for a vessel based on immutable properties.
+ * Useful for preventing duplicates in history.
+ */
+export const generateVesselId = (manifest: Manifest): string => {
+  // Use a combination of Ship Name, Voyage Number, and Arrival Number (Escale)
+  const name = manifest.nom_navire || 'INCONNU';
+  const voyage = manifest.num_voyage || 'INCONNU';
+  const escale = manifest.numero_escale || 'INCONNU';
+  return `${name}-${voyage}-${escale}`.replace(/\s+/g, '').toUpperCase();
 };
 
 // --- Export Helper Functions ---
@@ -267,26 +330,26 @@ const triggerDownload = (workbook: XLSX.WorkBook, filename: string) => {
 export const downloadXlsx = (rows: ContainerRow[], fileName: string) => {
   const worksheet = XLSX.utils.json_to_sheet(rows);
   const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, "Manifest Data");
-  const cleanName = fileName.replace('.json', '') + '_Full_Export.xlsx';
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Données Manifeste");
+  const cleanName = fileName.replace('.json', '') + '_Export_Complet.xlsx';
   triggerDownload(workbook, cleanName);
 };
 
 export const downloadLCLReport = (data: LCLContainer[], fileName: string) => {
   const rows = data.flatMap(c => 
     c.bls.map(bl => ({
-      'Container No': c.num_conteneur,
-      'Size': c.taille_conteneur,
-      'BL Number': bl.num_bl,
-      'Consignee': bl.client,
-      'Weight': bl.weight
+      'N° Conteneur': c.num_conteneur,
+      'Taille': c.taille_conteneur,
+      'N° BL': bl.num_bl,
+      'Réceptionnaire': bl.client,
+      'Poids (Kg)': bl.weight
     }))
   );
   
   const worksheet = XLSX.utils.json_to_sheet(rows);
   const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, "LCL Containers");
-  const cleanName = fileName.replace('.json', '') + '_LCL_Report.xlsx';
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Conteneurs LCL");
+  const cleanName = fileName.replace('.json', '') + '_Rapport_LCL.xlsx';
   triggerDownload(workbook, cleanName);
 };
 
@@ -294,45 +357,46 @@ export const downloadSpecialCargoReport = (data: SpecialCargoContainer[], type: 
   const rows = data.flatMap(c => 
     c.bls.map(bl => {
       const base = {
-        'Container No': c.num_conteneur,
-        'Size': c.taille_conteneur,
+        'N° Conteneur': c.num_conteneur,
+        'Taille': c.taille_conteneur,
         'ISO': c.code_iso,
-        'BL Number': bl.num_bl,
-        'Consignee': bl.client,
-        'Weight': bl.weight
+        'N° BL': bl.num_bl,
+        'Réceptionnaire': bl.client,
+        'Poids (Kg)': bl.weight,
+        'Marchandise': c.marchandise || '' // Added description to export
       };
       
       if (type === 'IMDG') {
-        return { ...base, 'IMDG Class': c.classe_imdg, 'UN Number': c.code_un };
+        return { ...base, 'Classe IMDG': c.classe_imdg, 'Code UN': c.code_un };
       } else {
-        return { ...base, 'Temperature': c.temperature, 'Reefer Flag': c.is_active_reefer ? 'Y' : 'N' };
+        return { ...base, 'Température': c.temperature, 'Indicateur Reefer': c.is_active_reefer ? 'OUI' : 'NON' };
       }
     })
   );
 
   const worksheet = XLSX.utils.json_to_sheet(rows);
   const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, `${type} Containers`);
-  const cleanName = fileName.replace('.json', '') + `_${type}_Report.xlsx`;
+  XLSX.utils.book_append_sheet(workbook, worksheet, `Conteneurs ${type}`);
+  const cleanName = fileName.replace('.json', '') + `_Rapport_${type}.xlsx`;
   triggerDownload(workbook, cleanName);
 };
 
 export const downloadErrorReport = (data: ContainerError[], fileName: string) => {
   const rows = data.flatMap(c => 
     c.bls.map(bl => ({
-      'Container No': c.num_conteneur,
-      'Declared Size': c.taille_conteneur,
+      'N° Conteneur': c.num_conteneur,
+      'Taille Déclarée': c.taille_conteneur,
       'ISO': c.code_iso,
-      'Errors': c.reasons.join(', '),
-      'BL Number': bl.num_bl,
-      'Consignee': bl.client,
-      'Weight': bl.weight
+      'Erreurs': c.reasons.join(', '),
+      'N° BL': bl.num_bl,
+      'Réceptionnaire': bl.client,
+      'Poids (Kg)': bl.weight
     }))
   );
 
   const worksheet = XLSX.utils.json_to_sheet(rows);
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, "Anomalies");
-  const cleanName = fileName.replace('.json', '') + '_Anomalies_Report.xlsx';
+  const cleanName = fileName.replace('.json', '') + '_Rapport_Anomalies.xlsx';
   triggerDownload(workbook, cleanName);
 };

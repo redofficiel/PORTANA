@@ -16,19 +16,19 @@ export const LCLAnalysisPanel: React.FC<LCLAnalysisPanelProps> = ({ lclContainer
       <div className="px-6 py-4 border-b border-slate-200 bg-orange-50 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Layers className="h-5 w-5 text-orange-600" />
-          <h3 className="font-bold text-slate-800 text-lg">LCL / Groupage Containers</h3>
+          <h3 className="font-bold text-slate-800 text-lg">Conteneurs LCL / Groupage</h3>
         </div>
         <div className="flex items-center gap-3">
             <span className="bg-orange-100 text-orange-800 text-xs font-bold px-3 py-1 rounded-full border border-orange-200">
-            {lclContainers.length} Multi-BL Containers Detected
+            {lclContainers.length} Conteneurs Multi-BL Détectés
             </span>
             <button 
                 onClick={onExport}
                 className="flex items-center gap-2 px-3 py-1.5 bg-white border border-slate-300 rounded text-xs font-bold text-slate-700 hover:bg-slate-50 hover:text-orange-700 transition-colors"
-                title="Download LCL Report"
+                title="Télécharger le Rapport LCL"
             >
                 <Download className="h-3.5 w-3.5" />
-                Export List
+                Exporter Liste
             </button>
         </div>
       </div>
@@ -65,10 +65,10 @@ const LCLContainerCard: React.FC<{ container: LCLContainer }> = ({ container }) 
                 container.taille_conteneur === 40 ? 'bg-blue-100 text-blue-700' :
                 'bg-purple-100 text-purple-700'
               }`}>
-                {container.taille_conteneur > 0 ? `${container.taille_conteneur}'` : 'Unknown Size'}
+                {container.taille_conteneur > 0 ? `${container.taille_conteneur}'` : 'Taille Inconnue'}
               </span>
               <span className="text-xs text-slate-500">•</span>
-              <span className="text-xs text-slate-500 font-medium">{container.bls.length} Bills of Lading</span>
+              <span className="text-xs text-slate-500 font-medium">{container.bls.length} Connaissements (BLs)</span>
             </div>
           </div>
         </div>
@@ -91,9 +91,9 @@ const LCLContainerCard: React.FC<{ container: LCLContainer }> = ({ container }) 
            <table className="min-w-full text-sm">
              <thead>
                <tr className="text-left text-xs font-medium text-slate-500 uppercase tracking-wider border-b border-slate-100">
-                 <th className="pb-2 pl-2">BL Number</th>
-                 <th className="pb-2">Client Final</th>
-                 <th className="pb-2 text-right">Weight (Kg)</th>
+                 <th className="pb-2 pl-2">N° BL</th>
+                 <th className="pb-2">Réceptionnaire (Client Final)</th>
+                 <th className="pb-2 text-right">Poids (Kg)</th>
                </tr>
              </thead>
              <tbody className="divide-y divide-slate-50">
